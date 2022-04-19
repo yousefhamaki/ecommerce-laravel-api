@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\user\loginRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\auth\User;
@@ -205,12 +206,12 @@ class userController extends Controller
         //validation
         $validate = $this->check_validate($req, $this->resetpassValidation);
         if($validate !== "true"){return $validate;}
-
+        //set function needs
         $link = $req->app_link;
         $email = $req->email;
         //send mail
         $mail = $this->sendlink($link, $email);
-        if($mail == true){
+        if($mail){
             return "true";
         }
         return false;
