@@ -22,7 +22,9 @@ trait changepassmail {
             "button" => $linkhash,
         ];
 
+        //add to data
         $addtodata = ResetPass::insert($data_upload);
+        //sendmail
         $sendmail = Mail::to($email)->send(new resetpassword($details));
 
         if($addtodata && $sendmail)

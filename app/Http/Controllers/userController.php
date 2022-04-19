@@ -203,7 +203,7 @@ class userController extends Controller
 
     public function changepass(Request $req)
     {
-        //validation
+        //validation check
         $validate = $this->check_validate($req, $this->resetpassValidation);
         if($validate !== "true"){return $validate;}
         //set function needs
