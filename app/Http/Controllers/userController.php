@@ -12,6 +12,8 @@ use App\Http\Traits\createJson;
 use App\Http\Traits\changepassmail;
 use App\Http\Traits\ValidatationTrait;
 use App\Http\Traits\getuserInfo;
+use App\Models\auth\ResetPass;
+use Carbon\Carbon;
 
 class userController extends Controller
 {
@@ -172,36 +174,40 @@ class userController extends Controller
         //validation
         $validate = $this->check_validate($req, $this->changepasswordValidation);
         if($validate !== "true"){return $validate;}
-        $passwordCheck = $this->passwordCheck($req->newpassword);
 
-        if($req->oldpassword === $req->newpassword){
+        $oldpass = $req->oldpassword;
+        $newpass = $req->newpassword;
+        $usertoken = $req->user_token;
+
+        //checks for pass
+        $passwordCheck = $this->passwordCheck($newpass);
+
+        if($oldpass === $newpass){
             return response()->json([
                 "status" => false,
                 "newpassword" => false,
                 "message" => "you can't use the old password in new password"
             ]);
         }
-        if($passwordCheck !== true){
-            return $passwordCheck;
-        }
-        //get user id
+        if($passwordCheck !== true){return $passwordCheck;}
         $userInfo = $this->userInfo($req->usertoken);
-        if(Hash::check($req->oldpassword, $userInfo["userdata"]->password)){
+        if(Hash::check($oldpass, $userInfo["userdata"]->password)){
             User::where("id", "=", $userInfo["userdata"]->id)->update([
-                "password" => Hash::make($req->newpassword),
+                "password" => Hash::make($newpass),
             ]);
             return response()->json([
                 "status" => true,
                 "message" => "your password was shanged successfully"
             ]);
         }
+
         return response()->json([
             "status" => false,
             "message" => "your old password is not correct"
         ]);
     }
 
-    public function changepass(Request $req)
+    public function sendresetlink(Request $req)
     {
         //validation check
         $validate = $this->check_validate($req, $this->resetpassValidation);
@@ -217,8 +223,74 @@ class userController extends Controller
         return false;
     }
 
+    public function search_email_toreset(Request $req)
+    {
+        //validation check
+        $validate = $this->check_validate($req, $this->search_resetrequired);
+        if($validate !== "true"){return $validate;}
+
+        //search
+        $result = User::where("email", "=", $req->email)->orwhere("phone", "=", $req->email)->get();
+
+        $resultjson = [
+            "status" => true,
+            "user" => $result
+        ];
+
+        if(count($result) > 0)
+        return response()->json($resultjson);
+        else
+        return response()->json($this->nonuser);
+    }
+
+    public function changepassbyverified(Request $req)
+    {
+         //validation check
+         $validate = $this->check_validate($req, $this->ChangePassByVerifiedVlidate);
+         if($validate !== "true"){return $validate;}
+
+         //check about hash_link
+         $user_email = ResetPass::
+                select("email")
+                ->where("hash_id", "=", $req->hash_link)
+                ->where('created_at', '>', Carbon::now())
+                ->first();
+        $errormessage = [
+            "status" => false,
+            "errortype" => "notfound",
+            "message" => "Sorry this page isn't found"
+        ];
+
+         if(!isset($user_email->email)){return response()->json($errormessage);}
+
+        //start change password
+        $newpass = $req->newpass;
+
+        $passwordCheck = $this->passwordCheck($newpass);
+        if($passwordCheck !== true){return $passwordCheck;}
+
+        User::where("email", "=", $user_email->email)->update([
+            "password" => Hash::make($newpass),
+        ]);
+        return response()->json([
+            "status" => true,
+            "message" => "your password was shanged successfully"
+        ]);
+    }
 
     //private
+    private $ChangePassByVerifiedVlidate = [
+        "hash_link" => "required",
+        "newpass" => "required",
+    ];
+    private $search_resetrequired = [
+        "email" => "required",
+    ];
+    private $nonuser = [
+        "status" => false,
+        "error" => "user_error",
+        "message" => "user not found"
+    ];
     private $resetpassValidation = [
         "email" => "required",
         "app_link" => "required",
@@ -234,6 +306,7 @@ class userController extends Controller
         "app_token" => "required",
         "oldpassword" => "required:60",
         "newpassword" => "required|max:60|min:8",
+        "user_token" => "required"
     ];
     private $validUsername = [
         "status" => true,
